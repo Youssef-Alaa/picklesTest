@@ -98,18 +98,6 @@ const deployContract = async ({
     console.log(chalk.yellow(`Deploying ${name} (no parameters)`));
   }
 
-  const confirmationName = "confirmDeploy";
-  const responses = await inquirer.prompt([
-    {
-      type: "confirm",
-      name: confirmationName,
-      message: chalk.yellow("Continue?"),
-    },
-  ]);
-
-  if (responses[confirmationName]) {
-    const spinner = ora(`Deploying ${name}`).start();
-
     const gasPrice = await deployer.provider.getGasPrice();
     const fastGasPrice = gasPrice
       .mul(ethers.BigNumber.from(125))
@@ -119,8 +107,6 @@ const deployContract = async ({
       gasPrice: fastGasPrice,
     });
     await contract.deployed();
-
-    spinner.succeed(`Deployed ${name} to ${contract.address}`);
 
     const deployedOutput = path.resolve(__dirname, `deployed.json`);
     let deployedContent = {};
@@ -140,9 +126,6 @@ const deployContract = async ({
     );
 
     return new ethers.Contract(contract.address, abi, user);
-  }
-
-  process.exit(0);
 };
 
 module.exports = {
