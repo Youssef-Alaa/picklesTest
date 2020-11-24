@@ -2,17 +2,18 @@
 const { ethers } = require("ethers");
 const chalk = require("chalk");
 // const uniswap = require("@studydefi/money-legos/uniswap");
-// const erc20 = require("@studydefi/money-legos/erc20");
+const erc20 = require("@studydefi/money-legos/erc20");
 const { constants } = require('@openzeppelin/test-helpers');
 const { ZERO_ADDRESS } = constants;
-const { ABIS, BYTECODE, KEYS } = require("../scripts/constants");
-const { deployContract, provider, wallets } = require("../scripts/common");
+const { ABIS, BYTECODE, KEYS, ADDRESSES } = require("../scripts/constants");
+const { deployContract, swapEthFor, provider, wallets } = require("../scripts/common");
 
 jest.setTimeout(100000);
 let wallet;
 let Controller;
 let psUNIDAI;
 let StrategyUniEthDaiLpV4;
+let daiContract;
 
 const tempGov = wallets[0].address;
 const tempTimelock = wallets[0].address;
@@ -20,6 +21,9 @@ const strategist = wallets[1].address;
 const devfund = "0x2fee17F575fa65C06F10eA2e63DBBc50730F145D";
 const treasury = "0x066419EaEf5DE53cc5da0d8702b990c5bc7D1AB3";
 const uniEthDai = "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11";
+
+// util function
+const fromWei = (x) => ethers.utils.formatUnits(x, 18);
 
 describe("Test ControllerV4 Contract", () => {
   beforeAll(async () => {
@@ -117,5 +121,31 @@ describe("Test ControllerV4 Contract", () => {
     await setJarApproveAndSetStrategy(psUNIDAI, StrategyUniEthDaiLpV4);
     expect(psUNIDAI.address).not.toBe(ZERO_ADDRESS);
     expect(StrategyUniEthDaiLpV4.address).not.toBe(ZERO_ADDRESS);
+  });
+});
+
+describe("Test User adding DAI/ETH Liquidity on UniSwap", () => {
+  beforeAll(async () => {
+    user1 = await wallets[9];
+    
+    daiContract = new ethers.Contract(
+      erc20.dai.address,
+      erc20.dai.abi,
+      user1,
+    );
+  });
+  test("Buy DAI tokens", async () => {
+    const daiWeiBefore = await daiContract.balanceOf(user1.address);
+    const daiBefore = parseFloat(fromWei(daiWeiBefore));
+    await swapEthFor(ethers.utils.parseEther("10"), erc20.dai.address, user1);
+    const daiBalanceWei = await daiContract.balanceOf(user1.address);
+    const daiBalance = parseFloat(fromWei(daiBalanceWei));
+    expect(daiBalance).toBeGreaterThan(daiBefore);
+  });
+  test("Approve Uniswap for DAI tokens", async () => {
+    await daiContract.approve(ADDRESSES.UniswapV2.Router2, ethers.utils.parseEther("1000"));
+    const allowanceWei = await daiContract.allowance(user1.address, ADDRESSES.UniswapV2.Router2);
+    const allowance = parseFloat(fromWei(allowanceWei));
+    expect(allowance).toBeGreaterThan(0);
   });
 });
