@@ -4,16 +4,19 @@ const chalk = require("chalk");
 // const uniswap = require("@studydefi/money-legos/uniswap");
 const erc20 = require("@studydefi/money-legos/erc20");
 const { constants } = require('@openzeppelin/test-helpers');
+
 const { ZERO_ADDRESS } = constants;
-const { ABIS, BYTECODE, KEYS, ADDRESSES } = require("../scripts/constants");
-const { deployContract, swapEthFor, provider, wallets } = require("../scripts/common");
+const { ABIS, BYTECODE, ADDRESSES } = require("../scripts/constants");
+const { deployContract, swapEthFor, wallets } = require("../scripts/common");
 
 jest.setTimeout(100000);
 let wallet;
+let fastGasPrice;
 let Controller;
 let psUNIDAI;
 let StrategyUniEthDaiLpV4;
 let daiContract;
+let uniswapRouter;
 
 const tempGov = wallets[0].address;
 const tempTimelock = wallets[0].address;
@@ -24,6 +27,7 @@ const uniEthDai = "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11";
 
 // util function
 const fromWei = (x) => ethers.utils.formatUnits(x, 18);
+const now = parseInt(new Date().getTime() / 1000);
 
 describe("Test ControllerV4 Contract", () => {
   beforeAll(async () => {
@@ -63,10 +67,7 @@ describe("Test ControllerV4 Contract", () => {
 
   const setJarApproveAndSetStrategy = async (jar, strat) => {
     const gasPrice = await wallet.provider.getGasPrice();
-    const fastGasPrice = gasPrice
-      .mul(ethers.BigNumber.from(125))
-      .div(ethers.BigNumber.from(100));
-  
+    fastGasPrice = gasPrice.mul(ethers.BigNumber.from(125)).div(ethers.BigNumber.from(100));
     const want = await strat.want();
 
     let tx = await Controller.setJar(want, jar.address, {
@@ -127,25 +128,81 @@ describe("Test ControllerV4 Contract", () => {
 describe("Test User adding DAI/ETH Liquidity on UniSwap", () => {
   beforeAll(async () => {
     user1 = await wallets[9];
-    
     daiContract = new ethers.Contract(
-      erc20.dai.address,
+      ADDRESSES.ERC20.DAI,
       erc20.dai.abi,
       user1,
     );
+    uniswapRouter = new ethers.Contract(
+      ADDRESSES.UniswapV2.Router2,
+      ABIS.UniswapV2.Router2,
+      user1,
+    );
   });
+
   test("Buy DAI tokens", async () => {
+    const ethBalanceBefore = await user1.getBalance();
     const daiWeiBefore = await daiContract.balanceOf(user1.address);
     const daiBefore = parseFloat(fromWei(daiWeiBefore));
-    await swapEthFor(ethers.utils.parseEther("10"), erc20.dai.address, user1);
+    console.log(chalk.yellowBright(`DAI BalanceBefore: ${daiBefore}, `, `Eth Balance Before: ${ethBalanceBefore}`));
+
+    await swapEthFor(ethers.utils.parseEther("10"), ADDRESSES.ERC20.DAI, user1);
+    const ethBalanceAfter = await user1.getBalance();
     const daiBalanceWei = await daiContract.balanceOf(user1.address);
     const daiBalance = parseFloat(fromWei(daiBalanceWei));
+    console.log(chalk.yellowBright(`DAI BalanceAfter: ${daiBalance}, `, `Eth BalanceAfter: ${ethBalanceAfter}`));
+
     expect(daiBalance).toBeGreaterThan(daiBefore);
   });
+
   test("Approve Uniswap for DAI tokens", async () => {
-    await daiContract.approve(ADDRESSES.UniswapV2.Router2, ethers.utils.parseEther("1000"));
+    let tx = await daiContract.approve(ADDRESSES.UniswapV2.Router2, ethers.utils.parseEther("1000"));
+    await tx.wait();
     const allowanceWei = await daiContract.allowance(user1.address, ADDRESSES.UniswapV2.Router2);
     const allowance = parseFloat(fromWei(allowanceWei));
     expect(allowance).toBeGreaterThan(0);
+  });
+  
+  test("Add Eth/DAI liquidity to Uniswap", async () => {
+    const daiBeforeeWei = await daiContract.balanceOf(user1.address);
+    const daiBefore = parseFloat(fromWei(daiBeforeeWei));
+
+    const ethDaiPrice = await uniswapRouter.getAmountsIn(ethers.utils.parseEther("500"), [ADDRESSES.ERC20.WETH, ADDRESSES.ERC20.DAI]);
+    const ethAmount = ethDaiPrice[0]; 
+    const daiAmount = ethDaiPrice[1]; 
+    const ethRange = ethAmount.sub(ethers.utils.parseUnits("1", 16));
+    const daiRange = daiAmount.sub(ethers.utils.parseUnits("2", 18));
+    console.log(chalk.yellow(`ethAmount: ${ethAmount}, daiAmount: ${daiAmount}`));
+    
+    let tx = await uniswapRouter.addLiquidityETH(
+      daiContract.address,
+      daiAmount,
+      daiRange,
+      ethRange,
+      user1.address,
+      now + 420,
+      { 
+        value: ethAmount,
+        gasLimit: 10000000,
+        gasPrice: fastGasPrice,
+      }
+    );
+    await tx.wait();
+
+    const daiBalanceWei = await daiContract.balanceOf(user1.address);
+    const daiBalance = parseFloat(fromWei(daiBalanceWei));
+    console.log(chalk.yellow(`DAI BEFORE: ${daiBefore}, DAI AFTER: ${daiBalance}`));
+    expect(daiBefore).toBeGreaterThan(daiBalance);
+  });
+
+  test("Check User got LP tokens", async () => {
+    const uniswapPair = new ethers.Contract(
+      uniEthDai,
+      ABIS.UniswapV2.Pair,
+      user1,
+    );
+    const LPTokens = await uniswapPair.balanceOf(user1.address);
+    console.log(chalk.blue("uniLP TOKENS:", parseFloat(fromWei(LPTokens))));
+    expect(LPTokens).toBeGreaterThan(0);
   });
 });

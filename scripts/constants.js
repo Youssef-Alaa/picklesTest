@@ -103,6 +103,7 @@ const ABIS = {
   },
   UniswapV2: {
     Router2: DAPP_CONTRACTS["src/interfaces/uniswapv2.sol:UniswapRouterV2"].abi,
+    Pair: DAPP_CONTRACTS["src/interfaces/uniswapv2.sol:IUniswapV2Pair"].abi,
   },
 };
 

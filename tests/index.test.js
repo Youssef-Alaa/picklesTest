@@ -1,6 +1,7 @@
+// /* eslint-disable no-undef */
 // const { ethers } = require("ethers");
 
-// const PRIV_KEY = "";
+// const PRIV_KEY = "0x395df67f0c2d2d9fe1ad08d1bc8b6627011959b79c53d7dd6a3536a33ab8a4fd";
 
 // const startChain = async () => {
 //   const provider = new ethers.providers.JsonRpcProvider();
