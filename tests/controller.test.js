@@ -14,9 +14,12 @@ let wallet;
 let fastGasPrice;
 let Controller;
 let psUNIDAI;
+let psUNIDAIContract;
 let StrategyUniEthDaiLpV4;
 let daiContract;
 let uniswapRouter;
+let LPTokens;
+let uniswapPair;
 
 const tempGov = wallets[0].address;
 const tempTimelock = wallets[0].address;
@@ -138,6 +141,16 @@ describe("Test User adding DAI/ETH Liquidity on UniSwap", () => {
       ABIS.UniswapV2.Router2,
       user1,
     );
+    psUNIDAIContract = new ethers.Contract(
+      psUNIDAI.address,
+      ABIS.Pickle.PickleJar,
+      user1,
+    );
+    uniswapPair = new ethers.Contract(
+      uniEthDai,
+      ABIS.UniswapV2.Pair,
+      user1,
+    );
   });
 
   test("Buy DAI tokens", async () => {
@@ -196,13 +209,27 @@ describe("Test User adding DAI/ETH Liquidity on UniSwap", () => {
   });
 
   test("Check User got LP tokens", async () => {
-    const uniswapPair = new ethers.Contract(
-      uniEthDai,
-      ABIS.UniswapV2.Pair,
-      user1,
-    );
-    const LPTokens = await uniswapPair.balanceOf(user1.address);
+    LPTokens = await uniswapPair.balanceOf(user1.address);
     console.log(chalk.blue("uniLP TOKENS:", parseFloat(fromWei(LPTokens))));
-    expect(LPTokens).toBeGreaterThan(0);
+    expect(parseFloat(fromWei(LPTokens))).toBeGreaterThan(0);
+  });
+
+  test("Deposit uniLP tokens into Pickles EthDai Jar", async () => {
+    const pDAIBalanceBefore = await psUNIDAIContract.balanceOf(user1.address);
+    //Approve Tokens
+    let tx1 = await uniswapPair.approve(psUNIDAIContract.address, LPTokens);
+    await tx1.wait();
+    //Deposit into pickles jar
+    let tx2 = await psUNIDAIContract.deposit(LPTokens, {
+      gasLimit: 1000000,
+      gasPrice: fastGasPrice,
+    });
+    await tx2.wait();
+    
+    const pDAIBalanceAfter = await psUNIDAIContract.balanceOf(user1.address);
+    console.log(chalk.yellow(
+      `pDAI Balance Before: ${parseFloat(fromWei(pDAIBalanceBefore))},  pDAI Balance After: ${parseFloat(fromWei(pDAIBalanceAfter))}`
+    ));
+    expect(parseFloat(fromWei(pDAIBalanceAfter))).toBeGreaterThan(parseFloat(fromWei(pDAIBalanceBefore)));
   });
 });
