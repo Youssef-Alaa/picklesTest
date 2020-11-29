@@ -10,16 +10,11 @@ const { ABIS, BYTECODE, ADDRESSES } = require("../scripts/constants");
 const { deployContract, swapEthFor, wallets } = require("../scripts/common");
 
 jest.setTimeout(100000);
-let wallet;
 let fastGasPrice;
 let Controller;
 let psUNIDAI;
-let psUNIDAIContract;
 let StrategyUniEthDaiLpV4;
-let daiContract;
-let uniswapRouter;
 let LPTokens;
-let uniswapPair;
 
 const tempGov = wallets[0].address;
 const tempTimelock = wallets[0].address;
@@ -128,7 +123,7 @@ describe("Test ControllerV4 Contract", () => {
   });
 });
 
-describe("Test User adding DAI/ETH Liquidity on UniSwap", () => {
+describe("Test User investing DAI/ETH on UniSwap and Pickles", () => {
   beforeAll(async () => {
     user1 = await wallets[9];
     daiContract = new ethers.Contract(
@@ -231,5 +226,25 @@ describe("Test User adding DAI/ETH Liquidity on UniSwap", () => {
       `pDAI Balance Before: ${parseFloat(fromWei(pDAIBalanceBefore))},  pDAI Balance After: ${parseFloat(fromWei(pDAIBalanceAfter))}`
     ));
     expect(parseFloat(fromWei(pDAIBalanceAfter))).toBeGreaterThan(parseFloat(fromWei(pDAIBalanceBefore)));
+  });
+
+  test("Test pickles jar get ratio", async () => {
+    const ratio = await psUNIDAIContract.getRatio();
+    console.log(chalk.greenBright(ratio));
+  });
+
+  test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
+    const pDAIBalance = await psUNIDAIContract.balanceOf(user1.address);
+    let tx1 = await psUNIDAIContract.withdraw(pDAIBalance, {
+      gasLimit: 1000000,
+      gasPrice: fastGasPrice,
+    });
+    await tx1.wait();
+
+    const LPTokensAfter = await uniswapPair.balanceOf(user1.address);
+    console.log(chalk.yellow(
+      `uniTokens after withdrawl: ${parseFloat(fromWei(LPTokensAfter))}`
+    ));
+    expect(parseFloat(fromWei(LPTokensAfter))).toBeGreaterThanOrEqual(parseFloat(fromWei(LPTokens)));
   });
 });
