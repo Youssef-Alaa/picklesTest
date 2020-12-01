@@ -55,6 +55,15 @@ interface UniswapRouterV2 {
         uint256 deadline
     ) external returns (uint256 amountA, uint256 amountB);
 
+    function removeLiquidityETH(
+        address token,
+        uint liquidity,
+        uint amountTokenMin,
+        uint amountETHMin,
+        address to,
+        uint deadline
+    ) external returns (uint amountToken, uint amountETH);
+
     function getAmountsOut(uint256 amountIn, address[] calldata path)
         external
         view

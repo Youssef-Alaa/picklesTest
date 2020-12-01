@@ -11,12 +11,15 @@ const { deployContract, swapEthFor, wallets } = require("../scripts/common");
 
 jest.setTimeout(100000);
 let users = [];
+let investEthAmount = [];
+let investDaiAmount = [];
+let ethBalances = [];
+let daiBalances = [];
+let uniBalances = [];
 let fastGasPrice;
 let Controller;
 let psUNIDAI;
 let StrategyUniEthDaiLpV4;
-let LPTokens;
-let daiBalanceWei;
 
 const tempGov = wallets[0].address;
 const tempTimelock = wallets[0].address;
@@ -29,7 +32,7 @@ const uniEthDai = "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11";
 const fromWei = (x) => ethers.utils.formatUnits(x, 18);
 const now = parseInt(new Date().getTime() / 1000);
 
-describe("Test ControllerV4 Contract", () => {
+describe("Deploy Pickle Contracts", () => {
   beforeAll(async () => {
     let arr = [];
     for (let i = 0; i < 7; i++) {
@@ -106,7 +109,7 @@ describe("Test ControllerV4 Contract", () => {
 });
 
 for(let i = 0; i < 7; i++) {
-describe(`Test User investing DAI/ETH on UniSwap and Pickles of user ${i}`, () => {
+describe(`Test User ${i} investing DAI/ETH on UniSwap and Pickles Jar`, () => {
   beforeAll(async () => {
     daiContract = new ethers.Contract(
       ADDRESSES.ERC20.DAI,
@@ -131,32 +134,29 @@ describe(`Test User investing DAI/ETH on UniSwap and Pickles of user ${i}`, () =
   });
 
   test("Buy DAI tokens", async () => {
-    const daiWeiBefore = await daiContract.balanceOf(users[i].address);
-    const daiBefore = parseFloat(fromWei(daiWeiBefore));
     await swapEthFor(ethers.utils.parseEther("100"), ADDRESSES.ERC20.DAI, users[i]);
-    daiBalanceWei = await daiContract.balanceOf(users[i].address);
-    const daiBalance = parseFloat(fromWei(daiBalanceWei));
-    console.log(chalk.yellowBright(`DAI BalanceBefore: ${daiBefore}, DAI BalanceAfter: ${daiBalance}, `));
-    expect(daiBalance).toBeGreaterThan(daiBefore);
+    daiBalances[i] = await daiContract.balanceOf(users[i].address);
+    const daiBalance = parseFloat(fromWei(daiBalances[i]));
+    expect(daiBalance).toBeGreaterThan(0);
   });
 
   test("Approve Uniswap for DAI tokens", async () => {
-    await daiContract.approve(ADDRESSES.UniswapV2.Router2, daiBalanceWei);
+    await daiContract.approve(ADDRESSES.UniswapV2.Router2, daiBalances[i]);
     const allowanceWei = await daiContract.allowance(users[i].address, ADDRESSES.UniswapV2.Router2);
     const allowance = parseFloat(fromWei(allowanceWei));
-    expect(allowance).toBe(parseFloat(fromWei(daiBalanceWei)));
+    expect(allowance).toBe(parseFloat(fromWei(daiBalances[i])));
   });
   
   test("Add Eth/DAI liquidity to Uniswap", async () => {
-    let investDaiAmount = daiBalanceWei.sub(ethers.utils.parseUnits("200", 18));
-    const ethDaiPrice = await uniswapRouter.getAmountsIn(investDaiAmount, [ADDRESSES.ERC20.WETH, ADDRESSES.ERC20.DAI]);
-    const ethAmount = ethDaiPrice[0]; 
+    investDaiAmount[i] = daiBalances[i].sub(ethers.utils.parseUnits("200", 18));
+    ethBalances[i] = await users[i].getBalance();
+    const ethDaiPrice = await uniswapRouter.getAmountsIn(investDaiAmount[i], [ADDRESSES.ERC20.WETH, ADDRESSES.ERC20.DAI]);
+    investEthAmount[i] = ethDaiPrice[0]; 
     const daiAmount = ethDaiPrice[1]; 
-    const ethRange = ethAmount.sub(ethers.utils.parseUnits("1", 18));
+    const ethRange = investEthAmount[i].sub(ethers.utils.parseUnits("1", 18));
     const daiRange = daiAmount.sub(ethers.utils.parseUnits("200", 18));
-    console.log(chalk.yellow(`ethAmount: ${ethAmount}, daiAmount: ${daiAmount}`));
     
-    let tx = await uniswapRouter.addLiquidityETH(
+    await uniswapRouter.addLiquidityETH(
       daiContract.address,
       daiAmount,
       daiRange,
@@ -164,62 +164,91 @@ describe(`Test User investing DAI/ETH on UniSwap and Pickles of user ${i}`, () =
       users[i].address,
       now + 420,
       { 
-        value: ethAmount,
+        value: investEthAmount[i],
         gasLimit: 10000000,
         gasPrice: fastGasPrice,
       }
-    );
-    await tx.wait();
+    );  
 
     const daiBalanceAfter = await daiContract.balanceOf(users[i].address);
     const daiBalance = parseFloat(fromWei(daiBalanceAfter));
-    console.log(chalk.yellow(`add Liquidity to uniswap:: DAI BEFORE: ${parseFloat(fromWei(daiBalanceWei))}, DAI AFTER: ${daiBalance}`));
-    expect(parseFloat(fromWei(daiBalanceWei))).toBeGreaterThan(daiBalance);
+    console.log(chalk.yellow(
+      `[User ${i}] ADD LIQUIDITY TO UNISWAP::  DAI BEFORE: ${parseFloat(fromWei(daiBalances[i]))}, DAI AFTER: ${daiBalance}`
+    ));
+    expect(parseFloat(fromWei(daiBalances[i]))).toBeGreaterThan(daiBalance);
   });
 
-  // test("Check User got LP tokens", async () => {
-  //   LPTokens = await uniswapPair.balanceOf(user1.address);
-  //   console.log(chalk.blue("uniLP TOKENS:", parseFloat(fromWei(LPTokens))));
-  //   expect(parseFloat(fromWei(LPTokens))).toBeGreaterThan(0);
-  // });
+  test("Check User got LP tokens", async () => {
+    uniBalances[i] = await uniswapPair.balanceOf(users[i].address);
+    console.log(chalk.blue(`[User ${i}] uniLP TOKENS: ${parseFloat(fromWei(uniBalances[i]))}`));
+    expect(parseFloat(fromWei(uniBalances[i]))).toBeGreaterThan(0);
+  });
 
-  // test("Deposit uniLP tokens into Pickles EthDai Jar", async () => {
-  //   const pDAIBalanceBefore = await psUNIDAIContract.balanceOf(user1.address);
-  //   //Approve Tokens
-  //   let tx1 = await uniswapPair.approve(psUNIDAIContract.address, LPTokens);
-  //   await tx1.wait();
-  //   //Deposit into pickles jar
-  //   let tx2 = await psUNIDAIContract.deposit(LPTokens, {
-  //     gasLimit: 1000000,
-  //     gasPrice: fastGasPrice,
-  //   });
-  //   await tx2.wait();
+  test("Deposit uniLP tokens into Pickles EthDai Jar", async () => {
+    const pDAIBalanceBefore = await psUNIDAIContract.balanceOf(users[i].address);
+    //Approve Tokens
+    await uniswapPair.approve(psUNIDAIContract.address, uniBalances[i]);
+    //Deposit into pickles jar
+    await psUNIDAIContract.deposit(uniBalances[i], {
+      gasLimit: 1000000,
+      gasPrice: fastGasPrice,
+    });
     
-  //   const pDAIBalanceAfter = await psUNIDAIContract.balanceOf(user1.address);
-  //   console.log(chalk.yellow(
-  //     `pDAI Balance Before: ${parseFloat(fromWei(pDAIBalanceBefore))},  pDAI Balance After: ${parseFloat(fromWei(pDAIBalanceAfter))}`
-  //   ));
-  //   expect(parseFloat(fromWei(pDAIBalanceAfter))).toBeGreaterThan(parseFloat(fromWei(pDAIBalanceBefore)));
-  // });
-
-  // test("Test pickles jar get ratio", async () => {
-  //   const ratio = await psUNIDAIContract.getRatio();
-  //   console.log(chalk.greenBright(ratio));
-  // });
-
-  // test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
-  //   const pDAIBalance = await psUNIDAIContract.balanceOf(user1.address);
-  //   let tx1 = await psUNIDAIContract.withdraw(pDAIBalance, {
-  //     gasLimit: 1000000,
-  //     gasPrice: fastGasPrice,
-  //   });
-  //   await tx1.wait();
-
-  //   const LPTokensAfter = await uniswapPair.balanceOf(user1.address);
-  //   console.log(chalk.yellow(
-  //     `uniTokens after withdrawl: ${parseFloat(fromWei(LPTokensAfter))}`
-  //   ));
-  //   expect(parseFloat(fromWei(LPTokensAfter))).toBeGreaterThanOrEqual(parseFloat(fromWei(LPTokens)));
-  // });
+    const pDAIBalanceAfter = await psUNIDAIContract.balanceOf(users[i].address);
+    console.log(chalk.yellow(
+      `[User ${i}] Deposit tokens in ETHDAI Jar:: pDAI Balance Before: ${parseFloat(fromWei(pDAIBalanceBefore))}, 
+      pDAI Balance After: ${parseFloat(fromWei(pDAIBalanceAfter))}`
+    ));
+    expect(parseFloat(fromWei(pDAIBalanceAfter))).toBeGreaterThan(parseFloat(fromWei(pDAIBalanceBefore)));
+  });
 });
+}
+
+for(let i = 0; i < 7; i++) {
+  describe(`Test User ${i} Withdrawl`, () => {
+    test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
+      const pDAIBalance = await psUNIDAIContract.balanceOf(users[i].address);
+      await psUNIDAIContract.connect(users[i]).withdraw(pDAIBalance, {
+        gasLimit: 1000000,
+        gasPrice: fastGasPrice,
+      });
+  
+      uniBalances[i] = await uniswapPair.balanceOf(users[i].address);
+      console.log(chalk.yellow(
+        `[User ${i}] Withdraw from pickle:: uniTokens: ${parseFloat(fromWei(uniBalances[i]))}`
+      ));
+      expect(parseFloat(fromWei(uniBalances[i]))).toBeGreaterThan(0);
+    });
+
+    test("withdraw DAI&ETH from Uniswap", async () => {
+      const tx1 = await uniswapPair.connect(users[i]).approve(uniswapRouter.address, uniBalances[i]);
+      await tx1.wait();
+      const ethBalanceBefore = await users[i].getBalance();
+      await uniswapRouter.connect(users[i]).removeLiquidityETH(
+        daiContract.address,
+        uniBalances[i],
+        0,
+        0,
+        users[i].address,
+        now + 420,
+        { 
+          gasLimit: 1000000,
+          gasPrice: fastGasPrice,
+        }
+      );  
+      const uniToken = await uniswapPair.balanceOf(users[i].address);
+      console.log(chalk.cyan(`[User ${i}] withdraw from Uniswap:: uniTokensAfterWithdraw = ${parseFloat(fromWei(uniToken))}`));
+      const daiBalanceAfter = await daiContract.balanceOf(users[i].address);
+      const ethBalanceAfter = await users[i].getBalance();
+      console.log(chalk.greenBright(
+        `[User ${i}] withdraw from Uniswap:: DAI Balance Before: ${parseFloat(fromWei(daiBalances[i]))}, 
+        DAI Balance After: ${parseFloat(fromWei(daiBalanceAfter))}`
+      ));
+      console.log(chalk.greenBright(
+        `[User ${i}] withdraw from Uniswap:: Eth After= ${parseFloat(fromWei(ethBalanceAfter))}, Eth Before= ${parseFloat(fromWei(ethBalances[i]))}
+        invested ether= ${parseFloat(fromWei(investEthAmount[i]))}`
+      ));
+      expect(parseFloat(fromWei(ethBalanceAfter))).toBeGreaterThan(parseFloat(fromWei(ethBalanceBefore)));
+    });
+  });
 }
