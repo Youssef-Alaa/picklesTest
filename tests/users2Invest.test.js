@@ -189,10 +189,7 @@ describe(`Test User ${i} investing DAI/ETH on UniSwap and Pickles Jar`, () => {
     //Approve Tokens
     await uniswapPair.approve(psUNIDAIContract.address, uniBalances[i]);
     //Deposit into pickles jar
-    await psUNIDAIContract.deposit(uniBalances[i], {
-      gasLimit: 1000000,
-      gasPrice: fastGasPrice,
-    });
+    await psUNIDAIContract.depositAll();
     
     const pDAIBalanceAfter = await psUNIDAIContract.balanceOf(users[i].address);
     console.log(chalk.yellow(
@@ -201,17 +198,38 @@ describe(`Test User ${i} investing DAI/ETH on UniSwap and Pickles Jar`, () => {
     ));
     expect(parseFloat(fromWei(pDAIBalanceAfter))).toBeGreaterThan(parseFloat(fromWei(pDAIBalanceBefore)));
   });
+
+  test("Admin call earn", async () => {
+    const jarBalanceBefore = await uniswapPair.balanceOf(psUNIDAI.address);
+    await psUNIDAIContract.connect(wallet).earn();
+    const jarBalanceAfter = await uniswapPair.balanceOf(psUNIDAI.address);
+    console.log(chalk.blueBright(
+      `Admin call earn:: Jar Balance Before ${parseFloat(fromWei(jarBalanceBefore))},
+      Jar Balance After: ${parseFloat(fromWei(jarBalanceAfter))}`
+    ));
+    expect(parseFloat(fromWei(jarBalanceBefore))).toBeGreaterThanOrEqual(parseFloat(fromWei(jarBalanceAfter)));
+  });
+
+  if(i==4 || i==6) {
+    test("Admin call harvest", async () => {
+      const uniBalanceBefore = await psUNIDAIContract.balance();
+      let tx = await StrategyUniEthDaiLpV4.harvest();
+      await tx.wait();
+      const uniBalanceAfter = await psUNIDAIContract.balance();
+      console.log(chalk.blueBright(
+        `Admin call harvest:: Jar Balance Before ${parseFloat(fromWei(uniBalanceBefore))},
+        Jar Balance After: ${parseFloat(fromWei(uniBalanceAfter))}`
+      ));
+      expect(parseFloat(fromWei(uniBalanceAfter))).toBeGreaterThanOrEqual(parseFloat(fromWei(uniBalanceBefore)));
+    });
+  }
 });
 }
 
 for(let i = 0; i < 7; i++) {
   describe(`Test User ${i} Withdrawl`, () => {
     test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
-      const pDAIBalance = await psUNIDAIContract.balanceOf(users[i].address);
-      await psUNIDAIContract.connect(users[i]).withdraw(pDAIBalance, {
-        gasLimit: 1000000,
-        gasPrice: fastGasPrice,
-      });
+      await psUNIDAIContract.connect(users[i]).withdrawAll();
   
       uniBalances[i] = await uniswapPair.balanceOf(users[i].address);
       console.log(chalk.yellow(
