@@ -209,8 +209,6 @@ describe(`Test User ${i} investing DAI/ETH on UniSwap and Pickles Jar`, () => {
     ));
     expect(parseFloat(fromWei(jarBalanceBefore))).toBeGreaterThanOrEqual(parseFloat(fromWei(jarBalanceAfter)));
   });
-
-  if(i==4 || i==6) {
     test("Admin call harvest", async () => {
       const uniBalanceBefore = await psUNIDAIContract.balance();
       let tx = await StrategyUniEthDaiLpV4.harvest();
@@ -222,7 +220,6 @@ describe(`Test User ${i} investing DAI/ETH on UniSwap and Pickles Jar`, () => {
       ));
       expect(parseFloat(fromWei(uniBalanceAfter))).toBeGreaterThanOrEqual(parseFloat(fromWei(uniBalanceBefore)));
     });
-  }
 });
 }
 

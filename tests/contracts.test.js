@@ -3,11 +3,11 @@ const { ethers } = require("ethers");
 const chalk = require("chalk");
 // const uniswap = require("@studydefi/money-legos/uniswap");
 const erc20 = require("@studydefi/money-legos/erc20");
-const { constants } = require('@openzeppelin/test-helpers');
+const { constants, time } = require('@openzeppelin/test-helpers');
 
 const { ZERO_ADDRESS } = constants;
 const { ABIS, BYTECODE, ADDRESSES } = require("../scripts/constants");
-const { deployContract, swapEthFor, wallets } = require("../scripts/common");
+const { deployContract, swapEthFor, wallets, provider } = require("../scripts/common");
 
 jest.setTimeout(100000);
 let fastGasPrice;
@@ -15,6 +15,7 @@ let Controller;
 let psUNIDAI;
 let StrategyUniEthDaiLpV4;
 let LPTokens;
+let currentBlock;
 
 const tempGov = wallets[0].address;
 const tempTimelock = wallets[0].address;
@@ -27,6 +28,7 @@ const uniEthDai = "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11";
 const fromWei = (x) => ethers.utils.formatUnits(x, 18);
 const now = parseInt(new Date().getTime() / 1000);
 
+
 describe("Test ControllerV4 Contract", () => {
   beforeAll(async () => {
     wallet = await wallets[0];
@@ -38,30 +40,30 @@ describe("Test ControllerV4 Contract", () => {
     });
   });
 
-  test("valid governance address", async () => {
-    const contGovernance = await Controller.governance();
-    expect(contGovernance).toBe(tempGov);
-  });
+//   test("valid governance address", async () => {
+//     const contGovernance = await Controller.governance();
+//     expect(contGovernance).toBe(tempGov);
+//   });
 
-  test("valid strategist address", async () => {
-    const contStrategist = await Controller.strategist();
-    expect(contStrategist).toBe(strategist);
-  });
+//   test("valid strategist address", async () => {
+//     const contStrategist = await Controller.strategist();
+//     expect(contStrategist).toBe(strategist);
+//   });
 
-  test("valid timeLock address", async () => {
-    const contTimeLock = await Controller.timelock();
-    expect(contTimeLock).toBe(tempTimelock);
-  });
+//   test("valid timeLock address", async () => {
+//     const contTimeLock = await Controller.timelock();
+//     expect(contTimeLock).toBe(tempTimelock);
+//   });
 
-  test("valid devFund address", async () => {
-    const contDEvFund = await Controller.devfund();
-    expect(contDEvFund).toBe(devfund);
-  });
+//   test("valid devFund address", async () => {
+//     const contDEvFund = await Controller.devfund();
+//     expect(contDEvFund).toBe(devfund);
+//   });
 
-  test("valid treasury address", async () => {
-    const contTreasury = await Controller.treasury();
-    expect(contTreasury).toBe(treasury);
-  });
+//   test("valid treasury address", async () => {
+//     const contTreasury = await Controller.treasury();
+//     expect(contTreasury).toBe(treasury);
+//   });
 
   const setJarApproveAndSetStrategy = async (jar, strat) => {
     const gasPrice = await wallet.provider.getGasPrice();
@@ -123,7 +125,7 @@ describe("Test ControllerV4 Contract", () => {
   });
 });
 
-describe("Test User investing DAI/ETH on UniSwap and Pickles", () => {
+describe("Test User investing DAI/ETH on UniSwap and Pickles Jars", () => {
   beforeAll(async () => {
     user1 = await wallets[9];
     daiContract = new ethers.Contract(
@@ -255,14 +257,126 @@ describe("Test User investing DAI/ETH on UniSwap and Pickles", () => {
   //   ));
   //   expect(parseFloat(fromWei(uniBalanceAfter))).toBeGreaterThanOrEqual(parseFloat(fromWei(uniBalanceBefore)));
   // });  
-  test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
-    let tx1 = await psUNIDAIContract.withdrawAll();
+
+  // test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
+  //   let tx1 = await psUNIDAIContract.withdrawAll();
+  //   await tx1.wait();
+
+  //   const LPTokensAfter = await uniswapPair.balanceOf(user1.address);
+  //   console.log(chalk.yellow(
+  //     `uniTokens after withdrawl: ${parseFloat(fromWei(LPTokensAfter))}`
+  //   ));
+  //   // expect(parseFloat(fromWei(LPTokensAfter))).toBeGreaterThanOrEqual(parseFloat(fromWei(LPTokens)));
+  // });
+});
+
+describe("Test pUniDai farm", () => {
+  let pDAIBalanceBefore;
+  let gasPrice;
+  let fastGasPrice;
+
+  beforeAll(async () => {
+    pickleToken = await deployContract({
+      name: "pickleToken",
+      abi: ABIS.PickleToken,
+      bytecode: BYTECODE.PickleToken,
+      args: []
+    });
+
+    currentBlock = await provider.getBlockNumber();
+    masterchef = await deployContract({
+      name: "masterchef",
+      abi: ABIS.Masterchef,
+      bytecode: BYTECODE.Masterchef,
+      args: [pickleToken.address, wallet.address, 100, currentBlock, currentBlock+100]
+    });
+  });
+
+  test("Contract:: Pickle tokens total supply", async () => {
+    const totalSupply = await pickleToken.totalSupply();
+    expect(parseFloat(fromWei(totalSupply))).toBe(0);
+  });
+
+  test("Contract:: Pickles per block are 100", async () => {
+    const picklePerBlock = await masterchef.picklePerBlock();
+    expect(parseInt(picklePerBlock)).toBe(100);
+  });
+
+  test("Renounce pickle ownership to masterchef", async () => {
+    await pickleToken.transferOwnership(masterchef.address);
+    const owner = await pickleToken.owner();
+    expect(owner).toBe(masterchef.address);
+  });
+
+  test("Admin add Farm for psUniDAI", async () => {
+    await masterchef.add(10, psUNIDAIContract.address, false);
+    const poolLen = await masterchef.poolLength();
+    expect(parseInt(poolLen)).toBe(1);
+  });
+
+  test("User deposit psUniDAI in Farm", async () => {
+    pDAIBalanceBefore = await psUNIDAIContract.balanceOf(user1.address);
+
+    let tx1 = await psUNIDAIContract.approve(masterchef.address, pDAIBalanceBefore);
     await tx1.wait();
 
-    const LPTokensAfter = await uniswapPair.balanceOf(user1.address);
+    await masterchef.connect(user1).deposit(0, pDAIBalanceBefore);
+
+    const pDAIBalanceAfter = await psUNIDAIContract.balanceOf(user1.address);
     console.log(chalk.yellow(
-      `uniTokens after withdrawl: ${parseFloat(fromWei(LPTokensAfter))}`
+      `Deposit in farm:: pDAI Balance Before: ${parseFloat(fromWei(pDAIBalanceBefore))}
+      Deposit in farm:: pDAI Balance After: ${parseFloat(fromWei(pDAIBalanceAfter))}`
     ));
-    // expect(parseFloat(fromWei(LPTokensAfter))).toBeGreaterThanOrEqual(parseFloat(fromWei(LPTokens)));
+    expect(parseFloat(fromWei(pDAIBalanceBefore))).toBeGreaterThan(parseFloat(fromWei(pDAIBalanceAfter)));
   });
+
+  test("Simulation time passing", async () => {
+    const currentBlock = await time.latestBlock();
+    let latestBlock = parseInt(currentBlock) + 30;
+    console.log(chalk.yellow(
+      `Time Simulation:: current block: ${currentBlock}, latest block: ${latestBlock}`
+    ));
+    await time.advanceBlockTo(latestBlock);
+    latestBlock = await time.latestBlock();
+    expect(parseInt(latestBlock)).toBeGreaterThan(parseInt(currentBlock));
+  });
+
+  test("Check pending Pickles", async () => {
+    gasPrice = await wallet.provider.getGasPrice();
+    fastGasPrice = gasPrice.mul(ethers.BigNumber.from(125)).div(ethers.BigNumber.from(100));
+
+    await masterchef.connect(wallet).massUpdatePools({
+      gasLimit: 1000000,
+      gasPrice: fastGasPrice,
+    });
+    const pendingPickles = await masterchef.pendingPickle(0, user1.address);
+    console.log(chalk.yellow(
+      `Farm:: pending pickles: ${pendingPickles}`
+    ));
+  });
+
+  test("Withdraw from farm", async () => {
+    let tx1 = await masterchef.connect(user1).withdraw(0, pDAIBalanceBefore, {
+      gasLimit: 1000000,
+      gasPrice: fastGasPrice,
+      from: user1.address
+    });
+    await tx1.wait();
+
+    const picklesGained = await pickleToken.balanceOf(user1.address);
+    console.log(chalk.yellow(
+      `Farm:: gained pickles: ${picklesGained}`
+    ));
+    expect(parseInt(picklesGained)).toBeGreaterThan(0);
+  });
+  // test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
+  //   let tx1 = await psUNIDAIContract.withdrawAll();
+  //   await tx1.wait();
+
+  //   const LPTokensAfter = await uniswapPair.balanceOf(user1.address);
+  //   console.log(chalk.yellow(
+  //     `uniTokens after withdrawl: ${parseFloat(fromWei(LPTokensAfter))}`
+  //   ));
+  //   // expect(parseFloat(fromWei(LPTokensAfter))).toBeGreaterThanOrEqual(parseFloat(fromWei(LPTokens)));
+  // });
 });

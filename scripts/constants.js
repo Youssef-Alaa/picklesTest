@@ -105,6 +105,8 @@ const ABIS = {
     Router2: DAPP_CONTRACTS["src/interfaces/uniswapv2.sol:UniswapRouterV2"].abi,
     Pair: DAPP_CONTRACTS["src/interfaces/uniswapv2.sol:IUniswapV2Pair"].abi,
   },
+  PickleToken: DAPP_CONTRACTS["src/yield-farming/pickle-token.sol:PickleToken"].abi,
+  Masterchef: DAPP_CONTRACTS["src/yield-farming/masterchef.sol:MasterChef"].abi,
 };
 
 const BYTECODE = {
@@ -128,6 +130,8 @@ const BYTECODE = {
       StrategyUniEthWBtcLpV2: StrategyUniEthWBtcLpV2.bin,
     },
   },
+  PickleToken: DAPP_CONTRACTS["src/yield-farming/pickle-token.sol:PickleToken"].bin,
+  Masterchef: DAPP_CONTRACTS["src/yield-farming/masterchef.sol:MasterChef"].bin,
 };
 
 module.exports = {
