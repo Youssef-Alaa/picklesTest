@@ -12,7 +12,7 @@ const { deployContract, swapEthFor, wallets, provider } = require("../scripts/co
 jest.setTimeout(100000);
 let fastGasPrice;
 let Controller;
-let psUNIDAI;
+let lUNIDAI;
 let StrategyUniEthDaiLpV4;
 let LPTokens;
 let currentBlock;
@@ -106,9 +106,9 @@ describe("Test ControllerV4 Contract", () => {
     }
   };
 
-  test("Deploy psUNIDAI + its Strategy AND Approve them", async () => {
-    psUNIDAI = await deployContract({
-      name: "psUNIDAI",
+  test("Deploy lUNIDAI + its Strategy AND Approve them", async () => {
+    lUNIDAI = await deployContract({
+      name: "lUNIDAI",
       abi: ABIS.Pickle.PickleJar,
       bytecode: BYTECODE.Pickle.PickleJar,
       args: [uniEthDai, tempGov, tempTimelock, Controller.address]
@@ -119,8 +119,8 @@ describe("Test ControllerV4 Contract", () => {
       bytecode: BYTECODE.Pickle.Strategies.StrategyUniEthDaiLpV4,
       args: [tempGov, strategist, Controller.address, tempTimelock]
     });
-    await setJarApproveAndSetStrategy(psUNIDAI, StrategyUniEthDaiLpV4);
-    expect(psUNIDAI.address).not.toBe(ZERO_ADDRESS);
+    await setJarApproveAndSetStrategy(lUNIDAI, StrategyUniEthDaiLpV4);
+    expect(lUNIDAI.address).not.toBe(ZERO_ADDRESS);
     expect(StrategyUniEthDaiLpV4.address).not.toBe(ZERO_ADDRESS);
   });
 });
@@ -138,8 +138,8 @@ describe("Test User investing DAI/ETH on UniSwap and Pickles Jars", () => {
       ABIS.UniswapV2.Router2,
       user1,
     );
-    psUNIDAIContract = new ethers.Contract(
-      psUNIDAI.address,
+    lUNIDAIContract = new ethers.Contract(
+      lUNIDAI.address,
       ABIS.Pickle.PickleJar,
       user1,
     );
@@ -212,18 +212,18 @@ describe("Test User investing DAI/ETH on UniSwap and Pickles Jars", () => {
   });
 
   test("Deposit uniLP tokens into Pickles EthDai Jar", async () => {
-    const pDAIBalanceBefore = await psUNIDAIContract.balanceOf(user1.address);
+    const pDAIBalanceBefore = await lUNIDAIContract.balanceOf(user1.address);
     //Approve Tokens
-    let tx1 = await uniswapPair.approve(psUNIDAIContract.address, LPTokens);
+    let tx1 = await uniswapPair.approve(lUNIDAIContract.address, LPTokens);
     await tx1.wait();
     //Deposit into pickles jar
-    let tx2 = await psUNIDAIContract.deposit(LPTokens, {
+    let tx2 = await lUNIDAIContract.deposit(LPTokens, {
       gasLimit: 1000000,
       gasPrice: fastGasPrice,
     });
     await tx2.wait();
     
-    const pDAIBalanceAfter = await psUNIDAIContract.balanceOf(user1.address);
+    const pDAIBalanceAfter = await lUNIDAIContract.balanceOf(user1.address);
     console.log(chalk.yellow(
       `pDAI Balance Before: ${parseFloat(fromWei(pDAIBalanceBefore))},  pDAI Balance After: ${parseFloat(fromWei(pDAIBalanceAfter))}`
     ));
@@ -231,14 +231,14 @@ describe("Test User investing DAI/ETH on UniSwap and Pickles Jars", () => {
   });
 
   test("Test pickles jar get ratio", async () => {
-    const ratio = await psUNIDAIContract.getRatio();
+    const ratio = await lUNIDAIContract.getRatio();
     console.log(chalk.greenBright(ratio));
   });
 
   // test("Admin call earn", async () => {
-  //   const jarBalanceBefore = await uniswapPair.balanceOf(psUNIDAI.address);
-  //   await psUNIDAIContract.connect(wallet).earn();
-  //   const jarBalanceAfter = await uniswapPair.balanceOf(psUNIDAI.address);
+  //   const jarBalanceBefore = await uniswapPair.balanceOf(lUNIDAI.address);
+  //   await lUNIDAIContract.connect(wallet).earn();
+  //   const jarBalanceAfter = await uniswapPair.balanceOf(lUNIDAI.address);
   //   console.log(chalk.blueBright(
   //     `Admin call earn:: Jar Balance Before ${parseFloat(fromWei(jarBalanceBefore))},
   //     Jar Balance After: ${parseFloat(fromWei(jarBalanceAfter))}`
@@ -247,10 +247,10 @@ describe("Test User investing DAI/ETH on UniSwap and Pickles Jars", () => {
   // });  
 
   // test("Admin call harvest", async () => {
-  //   const uniBalanceBefore = await psUNIDAIContract.balance();
+  //   const uniBalanceBefore = await lUNIDAIContract.balance();
   //   let tx = await StrategyUniEthDaiLpV4.harvest();
   //   await tx.wait();
-  //   const uniBalanceAfter = await psUNIDAIContract.balance();
+  //   const uniBalanceAfter = await lUNIDAIContract.balance();
   //   console.log(chalk.blueBright(
   //     `Admin call harvest:: Jar Balance Before ${parseFloat(fromWei(uniBalanceBefore))},
   //     Jar Balance After: ${parseFloat(fromWei(uniBalanceAfter))}`
@@ -259,7 +259,7 @@ describe("Test User investing DAI/ETH on UniSwap and Pickles Jars", () => {
   // });  
 
   // test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
-  //   let tx1 = await psUNIDAIContract.withdrawAll();
+  //   let tx1 = await lUNIDAIContract.withdrawAll();
   //   await tx1.wait();
 
   //   const LPTokensAfter = await uniswapPair.balanceOf(user1.address);
@@ -276,10 +276,10 @@ describe("Test pUniDai farm", () => {
   let fastGasPrice;
 
   beforeAll(async () => {
-    pickleToken = await deployContract({
-      name: "pickleToken",
-      abi: ABIS.PickleToken,
-      bytecode: BYTECODE.PickleToken,
+    LCNToken = await deployContract({
+      name: "LCNToken",
+      abi: ABIS.LCNToken,
+      bytecode: BYTECODE.LCNToken,
       args: []
     });
 
@@ -288,41 +288,41 @@ describe("Test pUniDai farm", () => {
       name: "masterchef",
       abi: ABIS.Masterchef,
       bytecode: BYTECODE.Masterchef,
-      args: [pickleToken.address, wallet.address, 100, currentBlock, currentBlock+100]
+      args: [LCNToken.address, wallet.address, 100, currentBlock, currentBlock+100]
     });
   });
 
-  test("Contract:: Pickle tokens total supply", async () => {
-    const totalSupply = await pickleToken.totalSupply();
+  test("Contract:: LCN tokens total supply", async () => {
+    const totalSupply = await LCNToken.totalSupply();
     expect(parseFloat(fromWei(totalSupply))).toBe(0);
   });
 
-  test("Contract:: Pickles per block are 100", async () => {
-    const picklePerBlock = await masterchef.picklePerBlock();
-    expect(parseInt(picklePerBlock)).toBe(100);
+  test("Contract:: LCNs per block are 100", async () => {
+    const LCNPerBlock = await masterchef.LCNPerBlock();
+    expect(parseInt(LCNPerBlock)).toBe(100);
   });
 
-  test("Renounce pickle ownership to masterchef", async () => {
-    await pickleToken.transferOwnership(masterchef.address);
-    const owner = await pickleToken.owner();
+  test("Renounce LCN ownership to masterchef", async () => {
+    await LCNToken.transferOwnership(masterchef.address);
+    const owner = await LCNToken.owner();
     expect(owner).toBe(masterchef.address);
   });
 
-  test("Admin add Farm for psUniDAI", async () => {
-    await masterchef.add(10, psUNIDAIContract.address, false);
+  test("Admin add Farm for lUNIDAI", async () => {
+    await masterchef.add(10, lUNIDAIContract.address, false);
     const poolLen = await masterchef.poolLength();
     expect(parseInt(poolLen)).toBe(1);
   });
 
-  test("User deposit psUniDAI in Farm", async () => {
-    pDAIBalanceBefore = await psUNIDAIContract.balanceOf(user1.address);
+  test("User deposit lUNIDAI in Farm", async () => {
+    pDAIBalanceBefore = await lUNIDAIContract.balanceOf(user1.address);
 
-    let tx1 = await psUNIDAIContract.approve(masterchef.address, pDAIBalanceBefore);
+    let tx1 = await lUNIDAIContract.approve(masterchef.address, pDAIBalanceBefore);
     await tx1.wait();
 
     await masterchef.connect(user1).deposit(0, pDAIBalanceBefore);
 
-    const pDAIBalanceAfter = await psUNIDAIContract.balanceOf(user1.address);
+    const pDAIBalanceAfter = await lUNIDAIContract.balanceOf(user1.address);
     console.log(chalk.yellow(
       `Deposit in farm:: pDAI Balance Before: ${parseFloat(fromWei(pDAIBalanceBefore))}
       Deposit in farm:: pDAI Balance After: ${parseFloat(fromWei(pDAIBalanceAfter))}`
@@ -341,7 +341,7 @@ describe("Test pUniDai farm", () => {
     expect(parseInt(latestBlock)).toBeGreaterThan(parseInt(currentBlock));
   });
 
-  test("Check pending Pickles", async () => {
+  test("Check pending LCNs", async () => {
     gasPrice = await wallet.provider.getGasPrice();
     fastGasPrice = gasPrice.mul(ethers.BigNumber.from(125)).div(ethers.BigNumber.from(100));
 
@@ -349,9 +349,9 @@ describe("Test pUniDai farm", () => {
       gasLimit: 1000000,
       gasPrice: fastGasPrice,
     });
-    const pendingPickles = await masterchef.pendingPickle(0, user1.address);
+    const pendingLCNs = await masterchef.pendingLCN(0, user1.address);
     console.log(chalk.yellow(
-      `Farm:: pending pickles: ${pendingPickles}`
+      `Farm:: pending LCNs: ${pendingLCNs}`
     ));
   });
 
@@ -363,14 +363,14 @@ describe("Test pUniDai farm", () => {
     });
     await tx1.wait();
 
-    const picklesGained = await pickleToken.balanceOf(user1.address);
+    const LCNsGained = await LCNToken.balanceOf(user1.address);
     console.log(chalk.yellow(
-      `Farm:: gained pickles: ${picklesGained}`
+      `Farm:: gained LCNs: ${LCNsGained}`
     ));
-    expect(parseInt(picklesGained)).toBeGreaterThan(0);
+    expect(parseInt(LCNsGained)).toBeGreaterThan(0);
   });
   // test("withdraw uniLP tokens from Pickles EthDai Jar", async () => {
-  //   let tx1 = await psUNIDAIContract.withdrawAll();
+  //   let tx1 = await lUNIDAIContract.withdrawAll();
   //   await tx1.wait();
 
   //   const LPTokensAfter = await uniswapPair.balanceOf(user1.address);

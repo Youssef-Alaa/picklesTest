@@ -4,12 +4,12 @@ import "../lib/enumerableSet.sol";
 import "../lib/safe-math.sol";
 import "../lib/erc20.sol";
 import "../lib/ownable.sol";
-import "./pickle-token.sol";
+import "./LCN-token.sol";
 
-// MasterChef was the master of pickle. He now governs over PICKLES. He can make Pickles and he is a fair guy.
+// MasterChef was the master of LCN. He now governs over LCNS. He can make LCNs and he is a fair guy.
 //
 // Note that it's ownable and the owner wields tremendous power. The ownership
-// will be transferred to a governance smart contract once PICKLES is sufficiently
+// will be transferred to a governance smart contract once LCNS is sufficiently
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
@@ -22,13 +22,13 @@ contract MasterChef is Ownable {
         uint256 amount; // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
-        // We do some fancy math here. Basically, any point in time, the amount of PICKLEs
+        // We do some fancy math here. Basically, any point in time, the amount of LCNs
         // entitled to a user but is pending to be distributed is:
         //
-        //   pending reward = (user.amount * pool.accPicklePerShare) - user.rewardDebt
+        //   pending reward = (user.amount * pool.accLCNPerShare) - user.rewardDebt
         //
         // Whenever a user deposits or withdraws LP tokens to a pool. Here's what happens:
-        //   1. The pool's `accPicklePerShare` (and `lastRewardBlock`) gets updated.
+        //   1. The pool's `accLCNPerShare` (and `lastRewardBlock`) gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
         //   4. User's `rewardDebt` gets updated.
@@ -37,22 +37,22 @@ contract MasterChef is Ownable {
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken; // Address of LP token contract.
-        uint256 allocPoint; // How many allocation points assigned to this pool. PICKLEs to distribute per block.
-        uint256 lastRewardBlock; // Last block number that PICKLEs distribution occurs.
-        uint256 accPicklePerShare; // Accumulated PICKLEs per share, times 1e12. See below.
+        uint256 allocPoint; // How many allocation points assigned to this pool. LCNs to distribute per block.
+        uint256 lastRewardBlock; // Last block number that LCNs distribution occurs.
+        uint256 accLCNPerShare; // Accumulated LCNs per share, times 1e12. See below.
     }
 
-    // The PICKLE TOKEN!
-    PickleToken public pickle;
+    // The LCN TOKEN!
+    LocalleNetworkToken public LCN;
     // Dev fund (2%, initially)
     uint256 public devFundDivRate = 50;
     // Dev address.
     address public devaddr;
-    // Block number when bonus PICKLE period ends.
+    // Block number when bonus LCN period ends.
     uint256 public bonusEndBlock;
-    // PICKLE tokens created per block.
-    uint256 public picklePerBlock;
-    // Bonus muliplier for early pickle makers.
+    // LCN tokens created per block.
+    uint256 public LCNPerBlock;
+    // Bonus muliplier for early LCN makers.
     uint256 public constant BONUS_MULTIPLIER = 10;
 
     // Info of each pool.
@@ -61,7 +61,7 @@ contract MasterChef is Ownable {
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    // The block number when PICKLE mining starts.
+    // The block number when LCN mining starts.
     uint256 public startBlock;
 
     // Events
@@ -75,15 +75,15 @@ contract MasterChef is Ownable {
     );
 
     constructor(
-        PickleToken _pickle,
+        LocalleNetworkToken _LCN,
         address _devaddr,
-        uint256 _picklePerBlock,
+        uint256 _LCNPerBlock,
         uint256 _startBlock,
         uint256 _bonusEndBlock
     ) public {
-        pickle = _pickle;
+        LCN = _LCN;
         devaddr = _devaddr;
-        picklePerBlock = _picklePerBlock;
+        LCNPerBlock = _LCNPerBlock;
         bonusEndBlock = _bonusEndBlock;
         startBlock = _startBlock;
     }
@@ -111,12 +111,12 @@ contract MasterChef is Ownable {
                 lpToken: _lpToken,
                 allocPoint: _allocPoint,
                 lastRewardBlock: lastRewardBlock,
-                accPicklePerShare: 0
+                accLCNPerShare: 0
             })
         );
     }
 
-    // Update the given pool's PICKLE allocation point. Can only be called by the owner.
+    // Update the given pool's LCN allocation point. Can only be called by the owner.
     function set(
         uint256 _pid,
         uint256 _allocPoint,
@@ -149,31 +149,31 @@ contract MasterChef is Ownable {
         }
     }
 
-    // View function to see pending PICKLEs on frontend.
-    function pendingPickle(uint256 _pid, address _user)
+    // View function to see pending LCNs on frontend.
+    function pendingLCN(uint256 _pid, address _user)
         external
         view
         returns (uint256)
     {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 accPicklePerShare = pool.accPicklePerShare;
+        uint256 accLCNPerShare = pool.accLCNPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 multiplier = getMultiplier(
                 pool.lastRewardBlock,
                 block.number
             );
-            uint256 pickleReward = multiplier
-                .mul(picklePerBlock)
+            uint256 LCNReward = multiplier
+                .mul(LCNPerBlock)
                 .mul(pool.allocPoint)
                 .div(totalAllocPoint);
-            accPicklePerShare = accPicklePerShare.add(
-                pickleReward.mul(1e12).div(lpSupply)
+            accLCNPerShare = accLCNPerShare.add(
+                LCNReward.mul(1e12).div(lpSupply)
             );
         }
         return
-            user.amount.mul(accPicklePerShare).div(1e12).sub(user.rewardDebt);
+            user.amount.mul(accLCNPerShare).div(1e12).sub(user.rewardDebt);
     }
 
     // Update reward vairables for all pools. Be careful of gas spending!
@@ -196,19 +196,19 @@ contract MasterChef is Ownable {
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-        uint256 pickleReward = multiplier
-            .mul(picklePerBlock)
+        uint256 LCNReward = multiplier
+            .mul(LCNPerBlock)
             .mul(pool.allocPoint)
             .div(totalAllocPoint);
-        pickle.mint(devaddr, pickleReward.div(devFundDivRate));
-        pickle.mint(address(this), pickleReward);
-        pool.accPicklePerShare = pool.accPicklePerShare.add(
-            pickleReward.mul(1e12).div(lpSupply)
+        LCN.mint(devaddr, LCNReward.div(devFundDivRate));
+        LCN.mint(address(this), LCNReward);
+        pool.accLCNPerShare = pool.accLCNPerShare.add(
+            LCNReward.mul(1e12).div(lpSupply)
         );
         pool.lastRewardBlock = block.number;
     }
 
-    // Deposit LP tokens to MasterChef for PICKLE allocation.
+    // Deposit LP tokens to MasterChef for LCN allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -216,10 +216,10 @@ contract MasterChef is Ownable {
         if (user.amount > 0) {
             uint256 pending = user
                 .amount
-                .mul(pool.accPicklePerShare)
+                .mul(pool.accLCNPerShare)
                 .div(1e12)
                 .sub(user.rewardDebt);
-            safePickleTransfer(msg.sender, pending);
+            safeLCNTransfer(msg.sender, pending);
         }
         pool.lpToken.safeTransferFrom(
             address(msg.sender),
@@ -227,7 +227,7 @@ contract MasterChef is Ownable {
             _amount
         );
         user.amount = user.amount.add(_amount);
-        user.rewardDebt = user.amount.mul(pool.accPicklePerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accLCNPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -237,12 +237,12 @@ contract MasterChef is Ownable {
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid);
-        uint256 pending = user.amount.mul(pool.accPicklePerShare).div(1e12).sub(
+        uint256 pending = user.amount.mul(pool.accLCNPerShare).div(1e12).sub(
             user.rewardDebt
         );
-        safePickleTransfer(msg.sender, pending);
+        safeLCNTransfer(msg.sender, pending);
         user.amount = user.amount.sub(_amount);
-        user.rewardDebt = user.amount.mul(pool.accPicklePerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accLCNPerShare).div(1e12);
         pool.lpToken.safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _pid, _amount);
     }
@@ -257,13 +257,13 @@ contract MasterChef is Ownable {
         user.rewardDebt = 0;
     }
 
-    // Safe pickle transfer function, just in case if rounding error causes pool to not have enough PICKLEs.
-    function safePickleTransfer(address _to, uint256 _amount) internal {
-        uint256 pickleBal = pickle.balanceOf(address(this));
-        if (_amount > pickleBal) {
-            pickle.transfer(_to, pickleBal);
+    // Safe LCN transfer function, just in case if rounding error causes pool to not have enough LCNs.
+    function safeLCNTransfer(address _to, uint256 _amount) internal {
+        uint256 LCNBal = LCN.balanceOf(address(this));
+        if (_amount > LCNBal) {
+            LCN.transfer(_to, LCNBal);
         } else {
-            pickle.transfer(_to, _amount);
+            LCN.transfer(_to, _amount);
         }
     }
 
@@ -275,10 +275,10 @@ contract MasterChef is Ownable {
 
     // **** Additional functions separate from the original masterchef contract ****
 
-    function setPicklePerBlock(uint256 _picklePerBlock) public onlyOwner {
-        require(_picklePerBlock > 0, "!picklePerBlock-0");
+    function setLCNPerBlock(uint256 _LCNPerBlock) public onlyOwner {
+        require(_LCNPerBlock > 0, "!LCNPerBlock-0");
 
-        picklePerBlock = _picklePerBlock;
+        LCNPerBlock = _LCNPerBlock;
     }
 
     function setBonusEndBlock(uint256 _bonusEndBlock) public onlyOwner {

@@ -24,8 +24,8 @@ contract PickleJar is ERC20 {
     constructor(address _token, address _governance, address _timelock, address _controller)
         public
         ERC20(
-            string(abi.encodePacked("pickling ", ERC20(_token).name())),
-            string(abi.encodePacked("p", ERC20(_token).symbol()))
+            string(abi.encodePacked("localle ", ERC20(_token).name())),
+            string(abi.encodePacked("l", ERC20(_token).symbol()))
         )
     {
         _setupDecimals(ERC20(_token).decimals());
